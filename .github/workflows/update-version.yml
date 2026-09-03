@@ -1,81 +1,35 @@
-# Update version.json when a published release has a higher version code than the version in version.json
-name: Sync version.json from release
+name: Update Version JSON
 
 on:
   release:
     types: [published]
 
-permissions:
-  contents: write
-
 jobs:
-  update-version:
+  update-json:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch }}
 
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-
-      - name: Extract release version code and read current version.json
-        id: read_versions
+      - name: Extract version code and update version.json
         run: |
-          set -euo pipefail
-          TAG="${{ github.event.release.tag_name }}"
+          VERSION_CODE=$(echo "${{ github.event.release.tag_name }}" | grep -oE '[0-9]+')
 
-          # Extract only numbers from tag (e.g., 'v2' or '2' -> '2')
-          REL_VER=$(echo "$TAG" | grep -oE '[0-9]+' | head -n1 || true)
-          if [ -z "$REL_VER" ]; then
-            echo "release_version_not_found=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          echo "release_version=$REL_VER" >> $GITHUB_OUTPUT
-          echo "release_version_not_found=false" >> $GITHUB_OUTPUT
-
-          if [ ! -f version.json ]; then
-            echo "version_json_exists=false" >> $GITHUB_OUTPUT
-            echo "current_version=0" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          CUR_VER=$(jq -r '.latest_version_code // 0' version.json)
-          echo "current_version=$CUR_VER" >> $GITHUB_OUTPUT
-          echo "version_json_exists=true" >> $GITHUB_OUTPUT
-
-      - name: Update version.json if release version is higher
-        if: steps.read_versions.outputs.release_version_not_found != 'true'
-        run: |
-          set -euo pipefail
-          REL=${{ steps.read_versions.outputs.release_version }}
-          CUR=${{ steps.read_versions.outputs.current_version }}
-
-          echo "Release version code: $REL"
-          echo "Current version code in version.json: $CUR"
-
-          if [ "$REL" -gt "$CUR" ]; then
-            echo "Release $REL is greater than current $CUR — updating version.json"
-            cat <<EOF > version.json
+          cat <<EOF > version.json
           {
-            "latest_version_code": ${REL},
+            "latest_version_code": ${VERSION_CODE},
             "download_url": "https://github.com/Corey935xx/SpotifyVisualizer/releases/latest/download/SpotifyVisualizer.apk"
           }
           EOF
-          else
-            echo "Release $REL is not greater than current $CUR; skipping update."
-            exit 0
-          fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add version.json
-
-          if git diff --staged --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "chore: update version.json to $REL"
-            git push
-            echo "Pushed updated version.json"
-          fi
+          git commit -m "auto: update version.json to version ${VERSION_CODE}" || exit 0
+          git push
