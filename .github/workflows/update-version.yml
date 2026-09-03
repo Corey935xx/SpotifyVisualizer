@@ -1,44 +1,54 @@
 name: Update Version JSON
 
 on:
-  release:
-    types: [published]
-
-permissions:
-  contents: write
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *' # daily at midnight UTC; adjust as needed
 
 jobs:
-  update-json:
+  update-version:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout default branch
         uses: actions/checkout@v4
         with:
+          # check out the repository's default branch to avoid detached HEAD
+          ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
+          persist-credentials: true
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - id: extract
-        name: Extract version code and update version.json
+      - name: Configure git user
         run: |
-          VERSION_CODE=$(echo "${{ github.event.release.tag_name }}" | grep -oE '[0-9]+')
-          
-          cat <<EOF > version.json
-          {
-            "latest_version_code": ${VERSION_CODE},
-            "download_url": "https://github.com/Corey935xx/SpotifyVisualizer/releases/latest/download/SpotifyVisualizer.apk"
-          }
-          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # expose the numeric version for later steps
-          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
-
-      - name: Configure git
+      - name: Generate version.json and commit if changed
+        id: gen
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          # generate a simple timestamp-based version code (change logic if you prefer)
+          VERSION_CODE=$(date +%Y%m%d%H%M%S)
+          echo "Using VERSION_CODE=${VERSION_CODE}"
 
-      - name: Commit and push changes
-        run: |
-          git checkout main
+          # create/update version.json
+          cat > version.json <<EOF
+{
+  "version_code": "${VERSION_CODE}"
+}
+EOF
+
           git add version.json
-          git commit -m "auto: update version.json to version ${{ steps.extract.outputs.version_code }}" || exit 0
-          git push origin main
+          # only commit if there are staged changes
+          if ! git diff --cached --quiet; then
+            git commit -m "auto: update version.json to version ${VERSION_CODE}"
+            echo "committed=true" >> $GITHUB_OUTPUT
+          else
+            echo "committed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Push changes back to default branch (if commit was made)
+        if: steps.gen.outputs.committed == 'true'
+        run: |
+          BRANCH="${{ github.event.repository.default_branch }}"
+          # push current HEAD to the remote default branch explicitly
+          git push origin HEAD:refs/heads/"$BRANCH"
