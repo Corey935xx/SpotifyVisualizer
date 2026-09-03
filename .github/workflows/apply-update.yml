@@ -8,9 +8,7 @@ permissions:
   contents: write
 
 jobs:
-<Steps>
-  <Step title="Update and Push" subtitle="Runs on main branch">
-  ```yaml
+  update-version:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -19,5 +17,16 @@ jobs:
       - name: Write version.json
         run: |
           VERSION="${{ github.event.client_payload.version }}"
-          cat > version.json <<EOF "auto: "download_url": "[https://github.com/Corey935xx/SpotifyVisualizer/releases/latest/download/SpotifyVisualizer.apk](https://github.com/Corey935xx/SpotifyVisualizer/releases/latest/download/SpotifyVisualizer.apk)" "latest_version_code": ${VERSION},${{ 'version.json' - </Step Commit EOF ``` and branch: changes commit_message: file_pattern: github.event.client_payload.version main name: push stefanzweifel/git-auto-commit-action@v5 to update uses: version version.json with: { } }}">
-</Steps>
+          cat > version.json <<EOF
+          {
+            "latest_version_code": ${VERSION},
+            "download_url": "https://github.com/Corey935xx/SpotifyVisualizer/releases/latest/download/SpotifyVisualizer.apk"
+          }
+          EOF
+
+      - name: Commit and Push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "auto: update version.json to version ${{ github.event.client_payload.version }}"
+          file_pattern: 'version.json'
+          branch: main
