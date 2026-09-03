@@ -13,9 +13,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
 
       - name: Extract version code and update version.json
         run: |
@@ -33,3 +30,4 @@ jobs:
         with:
           commit_message: "auto: update version.json to version"
           file_pattern: 'version.json'
+          branch: main
