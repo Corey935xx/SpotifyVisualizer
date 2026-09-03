@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Extract version code and update version.json
         run: |
@@ -26,9 +28,7 @@ jobs:
           EOF
 
       - name: Commit and push changes
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add version.json
-          git commit -m "auto: update version.json to version ${VERSION_CODE}" || exit 0
-          git push
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "auto: update version.json to version"
+          file_pattern: 'version.json'
