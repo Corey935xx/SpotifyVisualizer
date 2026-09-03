@@ -18,21 +18,65 @@ jobs:
         with:
           ref: main
 
-      - name: Update version.json
+      - name: Extract and validate version from tag
+        id: extract_version
         run: |
-          VERSION_CODE=$(echo "${{ github.ref_name }}" | grep -oE '[0-9]+' | head -n1)
-          if [ -z "$VERSION_CODE" ]; then VERSION_CODE="0"; fi
+          # Extract version from tag (e.g., v1.2.3 -> 1.2.3)
+          TAG_NAME="${{ github.ref_name }}"
+          NEW_VERSION=$(echo "$TAG_NAME" | sed 's/^[vV]//')
+          
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $NEW_VERSION"
+
+      - name: Compare versions and update if higher
+        id: check_version
+        run: |
+          NEW_VERSION="${{ steps.extract_version.outputs.new_version }}"
+          
+          # Check if version.json exists and read current version
+          if [ -f version.json ]; then
+            CURRENT_VERSION=$(cat version.json | grep -o '"version": "[^"]*' | cut -d'"' -f4 || echo "0.0.0")
+            echo "Current version in file: $CURRENT_VERSION"
+          else
+            CURRENT_VERSION="0.0.0"
+            echo "version.json not found, starting with 0.0.0"
+          fi
+          
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          
+          # Compare versions using semantic versioning
+          # Convert to comparable format (e.g., 1.2.3 -> 010203)
+          new_normalized=$(echo "$NEW_VERSION" | awk -F. '{printf "%03d%03d%03d", $1, $2, $3}')
+          current_normalized=$(echo "$CURRENT_VERSION" | awk -F. '{printf "%03d%03d%03d", $1, $2, $3}')
+          
+          if [ "$new_normalized" -gt "$current_normalized" ]; then
+            echo "should_update=true" >> $GITHUB_OUTPUT
+            echo "✓ New version ($NEW_VERSION) is higher than current ($CURRENT_VERSION). Updating..."
+          else
+            echo "should_update=false" >> $GITHUB_OUTPUT
+            echo "✗ New version ($NEW_VERSION) is NOT higher than current ($CURRENT_VERSION). Skipping update."
+          fi
+
+      - name: Update version.json
+        if: steps.check_version.outputs.should_update == 'true'
+        run: |
+          NEW_VERSION="${{ steps.check_version.outputs.new_version }}"
           
           cat > version.json <<EOF
           {
-            "latest_version_code": ${VERSION_CODE},
-            "download_url": "https://github.com/Corey935xx/SpotifyVisualizer/releases/latest/download/SpotifyVisualizer.apk"
+            "version": "$NEW_VERSION",
+            "latest_version_code": "$NEW_VERSION",
+            "download_url": "https://github.com/Corey935xx/SpotifyVisualizer/releases/tag/v$NEW_VERSION"
           }
           EOF
+          
+          echo "Updated version.json with version: $NEW_VERSION"
 
       - name: Commit and Push changes
+        if: steps.check_version.outputs.should_update == 'true'
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "auto: update version.json to version ${VERSION_CODE}"
+          commit_message: "auto: update version.json to ${{ steps.check_version.outputs.new_version }}"
           branch: main
           file_pattern: 'version.json'
