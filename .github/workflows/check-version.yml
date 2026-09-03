@@ -1,0 +1,20 @@
+name: 1. Check and Dispatch Version
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract version and trigger update
+        run: |
+          VERSION_CODE=$(echo "${{ github.event.release.tag_name }}" | grep -oE '[0-9]+' | head -n1)
+          if [ -z "$VERSION_CODE" ]; then VERSION_CODE="0"; fi
+
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/dispatches \
+            -d "{\"event_type\":\"update-version\",\"client_payload\":{\"version\":\"${VERSION_CODE}\"}}"
