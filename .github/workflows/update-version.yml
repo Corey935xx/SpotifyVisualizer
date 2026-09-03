@@ -13,8 +13,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Checkout the branch we want to push to (avoid detached HEAD when the workflow is triggered by a tag)
+          ref: main
 
-      - name: Extract version code and update version.json
+      - id: extract
+        name: Extract version code and update version.json
         run: |
           VERSION_CODE=$(echo "${{ github.event.release.tag_name }}" | grep -oE '[0-9]+')
           
@@ -25,9 +30,12 @@ jobs:
           }
           EOF
 
+          # expose the numeric version for later steps
+          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "auto: update version.json to version"
+          commit_message: "auto: update version.json to version ${{ steps.extract.outputs.version_code }}"
           file_pattern: 'version.json'
           branch: main
