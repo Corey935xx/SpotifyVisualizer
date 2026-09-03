@@ -1,0 +1,36 @@
+name: Update Version JSON
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  update-json:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Update version.json
+        run: |
+          VERSION_CODE=$(echo "${{ github.event.release.tag_name }}" | grep -oE '[0-9]+' | head -n1)
+          if [ -z "$VERSION_CODE" ]; then VERSION_CODE="0"; fi
+          
+          cat > version.json <<EOF
+          {
+            "latest_version_code": ${VERSION_CODE},
+            "download_url": "https://github.com/Corey935xx/SpotifyVisualizer/releases/latest/download/SpotifyVisualizer.apk"
+          }
+          EOF
+
+      - name: Commit and Push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "auto: update version.json to version"
+          branch: main
+          file_pattern: 'version.json'
