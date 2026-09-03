@@ -14,13 +14,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: main
+          fetch-depth: 0
 
-      - name: Update version.json
+      - name: Update version.json and push
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # Explicitly fetch and check out main to escape the release tag detached state
+          git fetch origin main
+          git checkout main
+
           VERSION_CODE=$(echo "${{ github.event.release.tag_name }}" | grep -oE '[0-9]+' | head -n1)
           if [ -z "$VERSION_CODE" ]; then VERSION_CODE="0"; fi
-          
+
           cat > version.json <<EOF
           {
             "latest_version_code": ${VERSION_CODE},
@@ -28,9 +35,6 @@ jobs:
           }
           EOF
 
-      - name: Commit and Push changes
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "auto: update version.json to version"
-          branch: main
-          file_pattern: 'version.json'
+          git add version.json
+          git diff --cached --quiet || git commit -m "auto: update version.json to version ${VERSION_CODE}"
+          git push origin main
