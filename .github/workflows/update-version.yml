@@ -4,11 +4,12 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
 jobs:
   update-json:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -16,7 +17,7 @@ jobs:
       - name: Extract version code and update version.json
         run: |
           VERSION_CODE=$(echo "${{ github.event.release.tag_name }}" | grep -oE '[0-9]+')
-
+          
           cat <<EOF > version.json
           {
             "latest_version_code": ${VERSION_CODE},
