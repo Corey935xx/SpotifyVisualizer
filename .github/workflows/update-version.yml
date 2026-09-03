@@ -11,38 +11,30 @@ jobs:
   update-json:
     runs-on: ubuntu-latest
     steps:
+      # Step 1: Explicitly check out the main branch, ignoring the detached release tag
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          ref: main
 
-      - name: Update version and push
+      # Step 2: Your idea - solely handle extracting the version and editing the file
+      - name: Edit version.json
         run: |
-          # 1. Force git out of detached HEAD and onto the main branch
-          git checkout main
-
-          # 2. Extract version number (e.g., 'V2' -> '2')
-          TAG="${{ github.event.release.tag_name }}"
-          VERSION_CODE=$(echo "$TAG" | grep -oE '[0-9]+' | head -n1)
+          VERSION_CODE=$(echo "${{ github.event.release.tag_name }}" | grep -oE '[0-9]+' | head -n1)
           if [ -z "$VERSION_CODE" ]; then VERSION_CODE="0"; fi
           
-          # 3. Create/overwrite the JSON file
           cat > version.json <<EOF
           {
             "latest_version_code": ${VERSION_CODE},
             "download_url": "https://github.com/Corey935xx/SpotifyVisualizer/releases/latest/download/SpotifyVisualizer.apk"
           }
           EOF
-          
-          # 4. Authenticate Git
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # 5. Commit and Push safely on the main branch
-          git add version.json
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "auto: update version.json to version ${VERSION_CODE}"
-            git push origin main
-          fi
+
+      # Step 3: Pass to the dedicated action to handle the commit/push safely
+      - name: Commit and Push
+        uses: EndBug/add-and-commit@v9
+        with:
+          author_name: github-actions[bot]
+          author_email: github-actions[bot]@users.noreply.github.com
+          message: 'auto: update version.json to version ${{ github.event.release.tag_name }}'
+          add: 'version.json'
