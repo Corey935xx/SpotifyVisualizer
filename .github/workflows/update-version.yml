@@ -11,20 +11,22 @@ jobs:
   update-json:
     runs-on: ubuntu-latest
     steps:
-      # Proven Fix: Force Git to attach directly to the 'main' branch
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: main
+          fetch-depth: 0
 
       - name: Update version and push
         run: |
-          # 1. Grab tag and extract number safely (fallback to 0 if it fails to read)
+          # 1. Force git out of detached HEAD and onto the main branch
+          git checkout main
+
+          # 2. Extract version number (e.g., 'V2' -> '2')
           TAG="${{ github.event.release.tag_name }}"
           VERSION_CODE=$(echo "$TAG" | grep -oE '[0-9]+' | head -n1)
           if [ -z "$VERSION_CODE" ]; then VERSION_CODE="0"; fi
           
-          # 2. Overwrite the JSON file
+          # 3. Create/overwrite the JSON file
           cat > version.json <<EOF
           {
             "latest_version_code": ${VERSION_CODE},
@@ -32,11 +34,11 @@ jobs:
           }
           EOF
           
-          # 3. Configure Git authentication
+          # 4. Authenticate Git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 4. Commit and Push normally (now that we are safely on 'main')
+          # 5. Commit and Push safely on the main branch
           git add version.json
           if git diff --cached --quiet; then
             echo "No changes to commit."
