@@ -4,34 +4,53 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
 jobs:
   update-json:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: true
 
       - name: Extract version code and update version.json
         run: |
-          VERSION_CODE=$(echo "${{ github.event.release.tag_name }}" | grep -oE '[0-9]+')
-
-          cat <<EOF > version.json
+          set -euo pipefail
+          
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION_CODE=$(echo "$TAG" | grep -oE '[0-9]+' | head -n1 || true)
+          
+          if [ -z "$VERSION_CODE" ]; then
+            echo "Could not extract a version number from tag: $TAG"
+            exit 1
+          fi
+          
+          cat > version.json <<EOF
           {
             "latest_version_code": ${VERSION_CODE},
             "download_url": "https://github.com/Corey935xx/SpotifyVisualizer/releases/latest/download/SpotifyVisualizer.apk"
           }
           EOF
-
+          
           echo "VERSION_CODE=${VERSION_CODE}" >> $GITHUB_ENV
 
       - name: Commit and push changes
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
           git add version.json
-          git commit -m "auto: update version.json to version ${VERSION_CODE}" || exit 0
-          git push origin HEAD:${{ github.event.repository.default_branch }}
+          
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "auto: update version.json to version ${VERSION_CODE}"
+            BRANCH="${{ github.event.repository.default_branch }}"
+            git push origin HEAD:refs/heads/"$BRANCH"
+          fi
