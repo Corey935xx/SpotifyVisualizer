@@ -1,0 +1,25 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # Runs every day at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Allows manual trigger from the GitHub UI
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST Endpoint
+        run: |
+          curl -s -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}"
+      - name: Send ntfy Notification
+        run: |
+          curl \
+            -H "Title: Supabase Keep-Alive" \
+            -H "Priority: low" \
+            -H "Tags: database,white_check_mark" \
+            -d "Supabase project successfully pinged." \
+            "https://ntfy.sh/SpotifyVisualizerAlert"
