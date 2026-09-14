@@ -21,5 +21,5 @@ jobs:
             -H "Title: Supabase Keep-Alive" \
             -H "Priority: low" \
             -H "Tags: database,white_check_mark" \
-            -d "Supabase project successfully pinged." \
+            -d "Supabase project (Spotify Visualizer) successfully pinged." \
             "https://ntfy.sh/SpotifyVisualizerAlert"
