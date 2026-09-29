@@ -11,15 +11,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping Supabase REST Endpoint
+        id: ping
+        continue-on-error: true
         run: |
-          curl -s -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/" \
+          curl -sS --retry 4 --retry-all-errors --retry-delay 5 --connect-timeout 10 --max-time 60 -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/" \
             -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}"
       - name: Send ntfy Notification
+        if: always()
         run: |
+          if [ "${{ steps.ping.outcome }}" = "success" ]; then
+            PRIORITY="low"
+            TAGS="database,white_check_mark"
+            MESSAGE="Supabase project (Spotify Visualizer) successfully pinged."
+          else
+            PRIORITY="high"
+            TAGS="database,warning"
+            MESSAGE="Supabase keep-alive ping failed (curl exit code 6: host resolution failure)."
+          fi
+
           curl \
             -H "Title: Supabase Keep-Alive" \
-            -H "Priority: low" \
-            -H "Tags: database,white_check_mark" \
-            -d "Supabase project (Spotify Visualizer) successfully pinged." \
+            -H "Priority: ${PRIORITY}" \
+            -H "Tags: ${TAGS}" \
+            -d "${MESSAGE}" \
             "https://ntfy.sh/SpotifyVisualizerAlert"
